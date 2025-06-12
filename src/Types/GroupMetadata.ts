@@ -5,6 +5,7 @@ export type GroupParticipant = Contact & {
 	isSuperAdmin?: boolean
 	admin?: 'admin' | 'superadmin' | null
 	jid?: string | undefined
+	lid?: string | undefined
 }
 
 export type ParticipantAction = 'add' | 'remove' | 'promote' | 'demote' | 'modify'
