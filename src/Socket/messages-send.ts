@@ -605,47 +605,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 
 				logger.debug({ jid }, 'adding device identity')
 			}
-
 			if (additionalNodes && additionalNodes.length > 0) {
 				;(stanza.content as BinaryNode[]).push(...additionalNodes)
 			}
-
-			const content = normalizeMessageContent(message)!
-			const contentType = getContentType(content)!
-
-			if((isJidGroup(jid) || isJidUser(jid)) && (
-				contentType === 'interactiveMessage' ||
-				contentType === 'buttonsMessage' ||
-				contentType === 'listMessage'
-			)) {
-				const bizNode: BinaryNode = { tag: 'biz', attrs: {} }
-
-				if((message?.viewOnceMessage?.message?.interactiveMessage || message?.viewOnceMessageV2?.message?.interactiveMessage || message?.viewOnceMessageV2Extension?.message?.interactiveMessage || message?.interactiveMessage) || (message?.viewOnceMessage?.message?.buttonsMessage || message?.viewOnceMessageV2?.message?.buttonsMessage || message?.viewOnceMessageV2Extension?.message?.buttonsMessage || message?.buttonsMessage)) {
-					bizNode.content = [{
-						tag: 'interactive',
-						attrs: {
-							type: 'native_flow',
-							v: '1'
-						},
-						content: [{
-							tag: 'native_flow',
-							attrs: { v: '9', name: 'mixed' }
-						}]
-					}]
-				} else if(message?.listMessage) {
-					// list message only support in private chat
-					bizNode.content = [{
-						tag: 'list',
-						attrs: {
-							type: 'product_list',
-							v: '2'
-						}
-					}]
-				}
-
-				(stanza.content as BinaryNode[]).push(bizNode);
-			}
-
 			logger.debug({ msgId }, `sending message to ${participants.length} devices`)
 
 			await sendNode(stanza)
@@ -655,26 +617,11 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 	return msgId
 }
 
-	const getMessageType = (msg: proto.IMessage) => {
-		if(msg.viewOnceMessage) {
-			return getMessageType(msg.viewOnceMessage.message!)
-		} else if(msg.viewOnceMessageV2) {
-			return getMessageType(msg.viewOnceMessageV2.message!)
-		} else if(msg.viewOnceMessageV2Extension) {
-			return getMessageType(msg.viewOnceMessageV2Extension.message!)
-		} else if(msg.ephemeralMessage) {
-			return getMessageType(msg.ephemeralMessage.message!)
-		} else if(msg.documentWithCaptionMessage) {
-			return getMessageType(msg.documentWithCaptionMessage.message!)
-		} else if(msg.reactionMessage) {
-			return 'reaction'
-		} else if(msg.pollCreationMessage || msg.pollCreationMessageV2 || msg.pollCreationMessageV3 || msg.pollUpdateMessage) {
+	const getMessageType = (message: proto.IMessage) => {
+		if (message.pollCreationMessage || message.pollCreationMessageV2 || message.pollCreationMessageV3) {
 			return 'poll'
-		} else if(getMediaType(msg)) {
-			return 'media'
-		} else {
-			return 'text'
 		}
+		return 'text'
 	}
 
 	const getMediaType = (message: proto.IMessage) => {
