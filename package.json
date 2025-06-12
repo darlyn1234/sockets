@@ -1,16 +1,17 @@
 {
-  "name": "socketzzz",
-  "version": "1.0.0",
+  "name": "baileys",
+  "version": "6.7.18",
   "description": "A WebSockets library for interacting with WhatsApp Web",
   "keywords": [
     "whatsapp",
     "automation"
   ],
+  "homepage": "https://github.com/WhiskeySockets/Baileys/",
   "repository": {
-    "url": "git@github.com:darlyn1234/socket.git"
+    "url": "git@github.com:WhiskeySockets/Baileys.git"
   },
   "license": "MIT",
-  "author": "darlingg",
+  "author": "Rajeh Taher",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "files": [
@@ -43,7 +44,7 @@
     "@hapi/boom": "^9.1.3",
     "async-mutex": "^0.5.0",
     "axios": "^1.6.0",
-    "libsignal": "github:ds6/sgn",
+    "libsignal": "github:darlyn1234/signal",
     "lodash": "^4.17.21",
     "music-metadata": "^7.12.3",
     "pino": "^9.6",
