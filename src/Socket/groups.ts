@@ -1,359 +1,533 @@
-import { proto } from '../../WAProto'
+import { proto } from "../../WAProto";
 import {
-	GroupMetadata,
-	GroupParticipant,
-	ParticipantAction,
-	SocketConfig,
-	WAMessageKey,
-	WAMessageStubType
-} from '../Types'
-import { generateMessageIDV2, unixTimestampSeconds } from '../Utils'
+  GroupMetadata,
+  GroupParticipant,
+  ParticipantAction,
+  SocketConfig,
+  WAMessageKey,
+  WAMessageStubType,
+} from "../Types";
 import {
-	BinaryNode,
-	getBinaryNodeChild,
-	getBinaryNodeChildren,
-	getBinaryNodeChildString,
-	jidEncode,
-	jidNormalizedUser
-} from '../WABinary'
-import { makeChatsSocket } from './chats'
+  NewsletterMetadata,
+  NewsletterViewRole,
+  XWAPaths,
+} from "../Types/NewsLetter";
+import { generateMessageIDV2, unixTimestampSeconds } from "../Utils";
+import {
+  BinaryNode,
+  getBinaryNodeChild,
+  getBinaryNodeChildren,
+  getBinaryNodeChildString,
+  jidEncode,
+  jidNormalizedUser,
+  S_WHATSAPP_NET,
+} from "../WABinary";
+import { makeChatsSocket } from "./chats";
+
+enum QueryIds {
+  JOB_MUTATION = "7150902998257522",
+  METADATA = "6620195908089573",
+  UNFOLLOW = "7238632346214362",
+  FOLLOW = "7871414976211147",
+  UNMUTE = "7337137176362961",
+  MUTE = "25151904754424642",
+  CREATE = "6996806640408138",
+  ADMIN_COUNT = "7130823597031706",
+  CHANGE_OWNER = "7341777602580933",
+  DELETE = "8316537688363079",
+  DEMOTE = "6551828931592903",
+}
 
 export const makeGroupsSocket = (config: SocketConfig) => {
-	const sock = makeChatsSocket(config)
-	const { authState, ev, query, upsertMessage } = sock
+  const sock = makeChatsSocket(config);
+  const { authState, ev, query, upsertMessage, generateMessageTag } = sock;
 
-	const groupQuery = async (jid: string, type: 'get' | 'set', content: BinaryNode[]) =>
-		query({
-			tag: 'iq',
-			attrs: {
-				type,
-				xmlns: 'w:g2',
-				to: jid
-			},
-			content
-		})
+  const encoder = new TextEncoder();
 
-	const groupMetadata = async (jid: string) => {
-		const result = await groupQuery(jid, 'get', [{ tag: 'query', attrs: { request: 'interactive' } }])
-		return extractGroupMetadata(result)
-	}
+  const groupQuery = async (
+    jid: string,
+    type: "get" | "set",
+    content: BinaryNode[]
+  ) =>
+    query({
+      tag: "iq",
+      attrs: {
+        type,
+        xmlns: "w:g2",
+        to: jid,
+      },
+      content,
+    });
 
-	const groupFetchAllParticipating = async () => {
-		const result = await query({
-			tag: 'iq',
-			attrs: {
-				to: '@g.us',
-				xmlns: 'w:g2',
-				type: 'get'
-			},
-			content: [
-				{
-					tag: 'participating',
-					attrs: {},
-					content: [
-						{ tag: 'participants', attrs: {} },
-						{ tag: 'description', attrs: {} }
-					]
-				}
-			]
-		})
-		const data: { [_: string]: GroupMetadata } = {}
-		const groupsChild = getBinaryNodeChild(result, 'groups')
-		if (groupsChild) {
-			const groups = getBinaryNodeChildren(groupsChild, 'group')
-			for (const groupNode of groups) {
-				const meta = extractGroupMetadata({
-					tag: 'result',
-					attrs: {},
-					content: [groupNode]
-				})
-				data[meta.id] = meta
-			}
-		}
+  const newsletterWMexQuery = async (
+    jid: string | undefined,
+    query_id: QueryIds,
+    content?: object
+  ) =>
+    query({
+      tag: "iq",
+      attrs: {
+        id: generateMessageTag(),
+        type: "get",
+        xmlns: "w:mex",
+        to: S_WHATSAPP_NET,
+      },
+      content: [
+        {
+          tag: "query",
+          attrs: { query_id },
+          content: encoder.encode(
+            JSON.stringify({
+              variables: {
+                newsletter_id: jid,
+                ...content,
+              },
+            })
+          ),
+        },
+      ],
+    });
 
-		sock.ev.emit('groups.update', Object.values(data))
+  const groupMetadata = async (jid: string) => {
+    const result = await groupQuery(jid, "get", [
+      { tag: "query", attrs: { request: "interactive" } },
+    ]);
+    return extractGroupMetadata(result);
+  };
 
-		return data
-	}
+  const groupFetchAllParticipating = async () => {
+    const result = await query({
+      tag: "iq",
+      attrs: {
+        to: "@g.us",
+        xmlns: "w:g2",
+        type: "get",
+      },
+      content: [
+        {
+          tag: "participating",
+          attrs: {},
+          content: [
+            { tag: "participants", attrs: {} },
+            { tag: "description", attrs: {} },
+          ],
+        },
+      ],
+    });
+    const data: { [_: string]: GroupMetadata } = {};
+    const groupsChild = getBinaryNodeChild(result, "groups");
+    if (groupsChild) {
+      const groups = getBinaryNodeChildren(groupsChild, "group");
+      for (const groupNode of groups) {
+        const meta = extractGroupMetadata({
+          tag: "result",
+          attrs: {},
+          content: [groupNode],
+        });
+        data[meta.id] = meta;
+      }
+    }
 
-	sock.ws.on('CB:ib,,dirty', async (node: BinaryNode) => {
-		const { attrs } = getBinaryNodeChild(node, 'dirty')!
-		if (attrs.type !== 'groups') {
-			return
-		}
+    sock.ev.emit("groups.update", Object.values(data));
 
-		await groupFetchAllParticipating()
-		await sock.cleanDirtyBits('groups')
-	})
+    return data;
+  };
 
-	return {
-		...sock,
-		groupQuery,
-		groupMetadata,
-		groupCreate: async (subject: string, participants: string[]) => {
-			const key = generateMessageIDV2()
-			const result = await groupQuery('@g.us', 'set', [
-				{
-					tag: 'create',
-					attrs: {
-						subject,
-						key
-					},
-					content: participants.map(jid => ({
-						tag: 'participant',
-						attrs: { jid }
-					}))
-				}
-			])
-			return extractGroupMetadata(result)
-		},
-		groupLeave: async (id: string) => {
-			await groupQuery('@g.us', 'set', [
-				{
-					tag: 'leave',
-					attrs: {},
-					content: [{ tag: 'group', attrs: { id } }]
-				}
-			])
-		},
-		groupUpdateSubject: async (jid: string, subject: string) => {
-			await groupQuery(jid, 'set', [
-				{
-					tag: 'subject',
-					attrs: {},
-					content: Buffer.from(subject, 'utf-8')
-				}
-			])
-		},
-		groupRequestParticipantsList: async (jid: string) => {
-			const result = await groupQuery(jid, 'get', [
-				{
-					tag: 'membership_approval_requests',
-					attrs: {}
-				}
-			])
-			const node = getBinaryNodeChild(result, 'membership_approval_requests')
-			const participants = getBinaryNodeChildren(node, 'membership_approval_request')
-			return participants.map(v => v.attrs)
-		},
-		groupRequestParticipantsUpdate: async (jid: string, participants: string[], action: 'approve' | 'reject') => {
-			const result = await groupQuery(jid, 'set', [
-				{
-					tag: 'membership_requests_action',
-					attrs: {},
-					content: [
-						{
-							tag: action,
-							attrs: {},
-							content: participants.map(jid => ({
-								tag: 'participant',
-								attrs: { jid }
-							}))
-						}
-					]
-				}
-			])
-			const node = getBinaryNodeChild(result, 'membership_requests_action')
-			const nodeAction = getBinaryNodeChild(node, action)
-			const participantsAffected = getBinaryNodeChildren(nodeAction, 'participant')
-			return participantsAffected.map(p => {
-				return { status: p.attrs.error || '200', jid: p.attrs.jid }
-			})
-		},
-		groupParticipantsUpdate: async (jid: string, participants: string[], action: ParticipantAction) => {
-			const result = await groupQuery(jid, 'set', [
-				{
-					tag: action,
-					attrs: {},
-					content: participants.map(jid => ({
-						tag: 'participant',
-						attrs: { jid }
-					}))
-				}
-			])
-			const node = getBinaryNodeChild(result, action)
-			const participantsAffected = getBinaryNodeChildren(node, 'participant')
-			return participantsAffected.map(p => {
-				return { status: p.attrs.error || '200', jid: p.attrs.jid, content: p }
-			})
-		},
-		groupUpdateDescription: async (jid: string, description?: string) => {
-			const metadata = await groupMetadata(jid)
-			const prev = metadata.descId ?? null
+  sock.ws.on("CB:ib,,dirty", async (node: BinaryNode) => {
+    const { attrs } = getBinaryNodeChild(node, "dirty")!;
+    if (attrs.type !== "groups") {
+      return;
+    }
 
-			await groupQuery(jid, 'set', [
-				{
-					tag: 'description',
-					attrs: {
-						...(description ? { id: generateMessageIDV2() } : { delete: 'true' }),
-						...(prev ? { prev } : {})
-					},
-					content: description ? [{ tag: 'body', attrs: {}, content: Buffer.from(description, 'utf-8') }] : undefined
-				}
-			])
-		},
-		groupInviteCode: async (jid: string) => {
-			const result = await groupQuery(jid, 'get', [{ tag: 'invite', attrs: {} }])
-			const inviteNode = getBinaryNodeChild(result, 'invite')
-			return inviteNode?.attrs.code
-		},
-		groupRevokeInvite: async (jid: string) => {
-			const result = await groupQuery(jid, 'set', [{ tag: 'invite', attrs: {} }])
-			const inviteNode = getBinaryNodeChild(result, 'invite')
-			return inviteNode?.attrs.code
-		},
-		groupAcceptInvite: async (code: string) => {
-			const results = await groupQuery('@g.us', 'set', [{ tag: 'invite', attrs: { code } }])
-			const result = getBinaryNodeChild(results, 'group')
-			return result?.attrs.jid
-		},
+    await groupFetchAllParticipating();
+    await sock.cleanDirtyBits("groups");
+  });
 
-		/**
-		 * revoke a v4 invite for someone
-		 * @param groupJid group jid
-		 * @param invitedJid jid of person you invited
-		 * @returns true if successful
-		 */
-		groupRevokeInviteV4: async (groupJid: string, invitedJid: string) => {
-			const result = await groupQuery(groupJid, 'set', [
-				{ tag: 'revoke', attrs: {}, content: [{ tag: 'participant', attrs: { jid: invitedJid } }] }
-			])
-			return !!result
-		},
+  return {
+    ...sock,
+    groupQuery,
+    groupMetadata,
+    newsletterMetadata: async (
+      type: "invite" | "jid",
+      key: string,
+      role?: NewsletterViewRole
+    ) => {
+      const result = await newsletterWMexQuery(undefined, QueryIds.METADATA, {
+        input: {
+          key,
+          type: type.toUpperCase(),
+          view_role: role || "GUEST",
+        },
+        fetch_viewer_metadata: true,
+        fetch_full_image: true,
+        fetch_creation_time: true,
+      });
 
-		/**
-		 * accept a GroupInviteMessage
-		 * @param key the key of the invite message, or optionally only provide the jid of the person who sent the invite
-		 * @param inviteMessage the message to accept
-		 */
-		groupAcceptInviteV4: ev.createBufferedFunction(
-			async (key: string | WAMessageKey, inviteMessage: proto.Message.IGroupInviteMessage) => {
-				key = typeof key === 'string' ? { remoteJid: key } : key
-				const results = await groupQuery(inviteMessage.groupJid!, 'set', [
-					{
-						tag: 'accept',
-						attrs: {
-							code: inviteMessage.inviteCode!,
-							expiration: inviteMessage.inviteExpiration!.toString(),
-							admin: key.remoteJid!
-						}
-					}
-				])
+      return extractNewsletterMetadata(result);
+    },
+    groupCreate: async (subject: string, participants: string[]) => {
+      const key = generateMessageIDV2();
+      const result = await groupQuery("@g.us", "set", [
+        {
+          tag: "create",
+          attrs: {
+            subject,
+            key,
+          },
+          content: participants.map((jid) => ({
+            tag: "participant",
+            attrs: { jid },
+          })),
+        },
+      ]);
+      return extractGroupMetadata(result);
+    },
+    groupLeave: async (id: string) => {
+      await groupQuery("@g.us", "set", [
+        {
+          tag: "leave",
+          attrs: {},
+          content: [{ tag: "group", attrs: { id } }],
+        },
+      ]);
+    },
+    groupUpdateSubject: async (jid: string, subject: string) => {
+      await groupQuery(jid, "set", [
+        {
+          tag: "subject",
+          attrs: {},
+          content: Buffer.from(subject, "utf-8"),
+        },
+      ]);
+    },
+    groupRequestParticipantsList: async (jid: string) => {
+      const result = await groupQuery(jid, "get", [
+        {
+          tag: "membership_approval_requests",
+          attrs: {},
+        },
+      ]);
+      const node = getBinaryNodeChild(result, "membership_approval_requests");
+      const participants = getBinaryNodeChildren(
+        node,
+        "membership_approval_request"
+      );
+      return participants.map((v) => v.attrs);
+    },
+    groupRequestParticipantsUpdate: async (
+      jid: string,
+      participants: string[],
+      action: "approve" | "reject"
+    ) => {
+      const result = await groupQuery(jid, "set", [
+        {
+          tag: "membership_requests_action",
+          attrs: {},
+          content: [
+            {
+              tag: action,
+              attrs: {},
+              content: participants.map((jid) => ({
+                tag: "participant",
+                attrs: { jid },
+              })),
+            },
+          ],
+        },
+      ]);
+      const node = getBinaryNodeChild(result, "membership_requests_action");
+      const nodeAction = getBinaryNodeChild(node, action);
+      const participantsAffected = getBinaryNodeChildren(
+        nodeAction,
+        "participant"
+      );
+      return participantsAffected.map((p) => {
+        return { status: p.attrs.error || "200", jid: p.attrs.jid };
+      });
+    },
+    groupParticipantsUpdate: async (
+      jid: string,
+      participants: string[],
+      action: ParticipantAction
+    ) => {
+      const result = await groupQuery(jid, "set", [
+        {
+          tag: action,
+          attrs: {},
+          content: participants.map((jid) => ({
+            tag: "participant",
+            attrs: { jid },
+          })),
+        },
+      ]);
+      const node = getBinaryNodeChild(result, action);
+      const participantsAffected = getBinaryNodeChildren(node, "participant");
+      return participantsAffected.map((p) => {
+        return { status: p.attrs.error || "200", jid: p.attrs.jid, content: p };
+      });
+    },
+    groupUpdateDescription: async (jid: string, description?: string) => {
+      const metadata = await groupMetadata(jid);
+      const prev = metadata.descId ?? null;
 
-				// if we have the full message key
-				// update the invite message to be expired
-				if (key.id) {
-					// create new invite message that is expired
-					inviteMessage = proto.Message.GroupInviteMessage.fromObject(inviteMessage)
-					inviteMessage.inviteExpiration = 0
-					inviteMessage.inviteCode = ''
-					ev.emit('messages.update', [
-						{
-							key,
-							update: {
-								message: {
-									groupInviteMessage: inviteMessage
-								}
-							}
-						}
-					])
-				}
+      await groupQuery(jid, "set", [
+        {
+          tag: "description",
+          attrs: {
+            ...(description
+              ? { id: generateMessageIDV2() }
+              : { delete: "true" }),
+            ...(prev ? { prev } : {}),
+          },
+          content: description
+            ? [
+                {
+                  tag: "body",
+                  attrs: {},
+                  content: Buffer.from(description, "utf-8"),
+                },
+              ]
+            : undefined,
+        },
+      ]);
+    },
+    groupInviteCode: async (jid: string) => {
+      const result = await groupQuery(jid, "get", [
+        { tag: "invite", attrs: {} },
+      ]);
+      const inviteNode = getBinaryNodeChild(result, "invite");
+      return inviteNode?.attrs.code;
+    },
+    groupRevokeInvite: async (jid: string) => {
+      const result = await groupQuery(jid, "set", [
+        { tag: "invite", attrs: {} },
+      ]);
+      const inviteNode = getBinaryNodeChild(result, "invite");
+      return inviteNode?.attrs.code;
+    },
+    groupAcceptInvite: async (code: string) => {
+      const results = await groupQuery("@g.us", "set", [
+        { tag: "invite", attrs: { code } },
+      ]);
+      const result = getBinaryNodeChild(results, "group");
+      return result?.attrs.jid;
+    },
 
-				// generate the group add message
-				await upsertMessage(
-					{
-						key: {
-							remoteJid: inviteMessage.groupJid,
-							id: generateMessageIDV2(sock.user?.id),
-							fromMe: false,
-							participant: key.remoteJid
-						},
-						messageStubType: WAMessageStubType.GROUP_PARTICIPANT_ADD,
-						messageStubParameters: [authState.creds.me!.id],
-						participant: key.remoteJid,
-						messageTimestamp: unixTimestampSeconds()
-					},
-					'notify'
-				)
+    /**
+     * revoke a v4 invite for someone
+     * @param groupJid group jid
+     * @param invitedJid jid of person you invited
+     * @returns true if successful
+     */
+    groupRevokeInviteV4: async (groupJid: string, invitedJid: string) => {
+      const result = await groupQuery(groupJid, "set", [
+        {
+          tag: "revoke",
+          attrs: {},
+          content: [{ tag: "participant", attrs: { jid: invitedJid } }],
+        },
+      ]);
+      return !!result;
+    },
 
-				return results.attrs.from
-			}
-		),
-		groupGetInviteInfo: async (code: string) => {
-			const results = await groupQuery('@g.us', 'get', [{ tag: 'invite', attrs: { code } }])
-			return extractGroupMetadata(results)
-		},
-		groupToggleEphemeral: async (jid: string, ephemeralExpiration: number) => {
-			const content: BinaryNode = ephemeralExpiration
-				? { tag: 'ephemeral', attrs: { expiration: ephemeralExpiration.toString() } }
-				: { tag: 'not_ephemeral', attrs: {} }
-			await groupQuery(jid, 'set', [content])
-		},
-		groupSettingUpdate: async (jid: string, setting: 'announcement' | 'not_announcement' | 'locked' | 'unlocked') => {
-			await groupQuery(jid, 'set', [{ tag: setting, attrs: {} }])
-		},
-		groupMemberAddMode: async (jid: string, mode: 'admin_add' | 'all_member_add') => {
-			await groupQuery(jid, 'set', [{ tag: 'member_add_mode', attrs: {}, content: mode }])
-		},
-		groupJoinApprovalMode: async (jid: string, mode: 'on' | 'off') => {
-			await groupQuery(jid, 'set', [
-				{ tag: 'membership_approval_mode', attrs: {}, content: [{ tag: 'group_join', attrs: { state: mode } }] }
-			])
-		},
-		groupFetchAllParticipating
-	}
-}
+    /**
+     * accept a GroupInviteMessage
+     * @param key the key of the invite message, or optionally only provide the jid of the person who sent the invite
+     * @param inviteMessage the message to accept
+     */
+    groupAcceptInviteV4: ev.createBufferedFunction(
+      async (
+        key: string | WAMessageKey,
+        inviteMessage: proto.Message.IGroupInviteMessage
+      ) => {
+        key = typeof key === "string" ? { remoteJid: key } : key;
+        const results = await groupQuery(inviteMessage.groupJid!, "set", [
+          {
+            tag: "accept",
+            attrs: {
+              code: inviteMessage.inviteCode!,
+              expiration: inviteMessage.inviteExpiration!.toString(),
+              admin: key.remoteJid!,
+            },
+          },
+        ]);
+
+        // if we have the full message key
+        // update the invite message to be expired
+        if (key.id) {
+          // create new invite message that is expired
+          inviteMessage =
+            proto.Message.GroupInviteMessage.fromObject(inviteMessage);
+          inviteMessage.inviteExpiration = 0;
+          inviteMessage.inviteCode = "";
+          ev.emit("messages.update", [
+            {
+              key,
+              update: {
+                message: {
+                  groupInviteMessage: inviteMessage,
+                },
+              },
+            },
+          ]);
+        }
+
+        // generate the group add message
+        await upsertMessage(
+          {
+            key: {
+              remoteJid: inviteMessage.groupJid,
+              id: generateMessageIDV2(sock.user?.id),
+              fromMe: false,
+              participant: key.remoteJid,
+            },
+            messageStubType: WAMessageStubType.GROUP_PARTICIPANT_ADD,
+            messageStubParameters: [authState.creds.me!.id],
+            participant: key.remoteJid,
+            messageTimestamp: unixTimestampSeconds(),
+          },
+          "notify"
+        );
+
+        return results.attrs.from;
+      }
+    ),
+    groupGetInviteInfo: async (code: string) => {
+      const results = await groupQuery("@g.us", "get", [
+        { tag: "invite", attrs: { code } },
+      ]);
+      return extractGroupMetadata(results);
+    },
+    groupToggleEphemeral: async (jid: string, ephemeralExpiration: number) => {
+      const content: BinaryNode = ephemeralExpiration
+        ? {
+            tag: "ephemeral",
+            attrs: { expiration: ephemeralExpiration.toString() },
+          }
+        : { tag: "not_ephemeral", attrs: {} };
+      await groupQuery(jid, "set", [content]);
+    },
+    groupSettingUpdate: async (
+      jid: string,
+      setting: "announcement" | "not_announcement" | "locked" | "unlocked"
+    ) => {
+      await groupQuery(jid, "set", [{ tag: setting, attrs: {} }]);
+    },
+    groupMemberAddMode: async (
+      jid: string,
+      mode: "admin_add" | "all_member_add"
+    ) => {
+      await groupQuery(jid, "set", [
+        { tag: "member_add_mode", attrs: {}, content: mode },
+      ]);
+    },
+    groupJoinApprovalMode: async (jid: string, mode: "on" | "off") => {
+      await groupQuery(jid, "set", [
+        {
+          tag: "membership_approval_mode",
+          attrs: {},
+          content: [{ tag: "group_join", attrs: { state: mode } }],
+        },
+      ]);
+    },
+    groupFetchAllParticipating,
+  };
+};
 
 export const extractGroupMetadata = (result: BinaryNode) => {
-	const group = getBinaryNodeChild(result, 'group')!
-	const descChild = getBinaryNodeChild(group, 'description')
-	let desc: string | undefined
-	let descId: string | undefined
-	let descOwner: string | undefined
-	let descOwnerJid: string | undefined
-	let descTime: number | undefined
-	if (descChild) {
-		desc = getBinaryNodeChildString(descChild, 'body')
-		descOwner = descChild.attrs.participant ? jidNormalizedUser(descChild.attrs.participant) : undefined
-		descOwnerJid = descChild.attrs.participant_pn ? jidNormalizedUser(descChild.attrs.participant_pn) : undefined
-		descTime = +descChild.attrs.t
-		descId = descChild.attrs.id
-	}
+  const group = getBinaryNodeChild(result, "group")!;
+  const descChild = getBinaryNodeChild(group, "description");
+  let desc: string | undefined;
+  let descId: string | undefined;
+  let descOwner: string | undefined;
+  let descOwnerJid: string | undefined;
+  let descTime: number | undefined;
+  if (descChild) {
+    desc = getBinaryNodeChildString(descChild, "body");
+    descOwner = descChild.attrs.participant
+      ? jidNormalizedUser(descChild.attrs.participant)
+      : undefined;
+    descOwnerJid = descChild.attrs.participant_pn
+      ? jidNormalizedUser(descChild.attrs.participant_pn)
+      : undefined;
+    descTime = +descChild.attrs.t;
+    descId = descChild.attrs.id;
+  }
 
-	const groupId = group.attrs.id.includes('@') ? group.attrs.id : jidEncode(group.attrs.id, 'g.us')
-	const eph = getBinaryNodeChild(group, 'ephemeral')?.attrs.expiration
-	const memberAddMode = getBinaryNodeChildString(group, 'member_add_mode') === 'all_member_add'
-	const metadata: GroupMetadata = {
-		id: groupId,
-		addressingMode: group.attrs.addressing_mode as 'pn' | 'lid',
-		subject: group.attrs.subject,
-		subjectOwner: group.attrs.s_o,
-		subjectOwnerJid: group.attrs.s_o_pn,
-		subjectTime: +group.attrs.s_t,
-		size: getBinaryNodeChildren(group, 'participant').length,
-		creation: +group.attrs.creation,
-		owner: group.attrs.creator ? jidNormalizedUser(group.attrs.creator) : undefined,
-		ownerJid: group.attrs.creator_pn ? jidNormalizedUser(group.attrs.creator_pn) : undefined,
-		desc,
-		descId,
-		descOwner,
-		descOwnerJid,
-		descTime,
-		linkedParent: getBinaryNodeChild(group, 'linked_parent')?.attrs.jid || undefined,
-		restrict: !!getBinaryNodeChild(group, 'locked'),
-		announce: !!getBinaryNodeChild(group, 'announcement'),
-		isCommunity: !!getBinaryNodeChild(group, 'parent'),
-		isCommunityAnnounce: !!getBinaryNodeChild(group, 'default_sub_group'),
-		joinApprovalMode: !!getBinaryNodeChild(group, 'membership_approval_mode'),
-		memberAddMode,
-		participants: getBinaryNodeChildren(group, 'participant').map(({ attrs }) => {
-			return {
-				id: attrs.jid,
-				jid: jidNormalizedUser(attrs?.phone_number || attrs?.jid),
-				admin: (attrs.type || null) as GroupParticipant['admin']
-			}
-		}),
-		ephemeralDuration: eph ? +eph : undefined
-	}
-	return metadata
-}
+  const groupId = group.attrs.id.includes("@")
+    ? group.attrs.id
+    : jidEncode(group.attrs.id, "g.us");
+  const eph = getBinaryNodeChild(group, "ephemeral")?.attrs.expiration;
+  const memberAddMode =
+    getBinaryNodeChildString(group, "member_add_mode") === "all_member_add";
+  const metadata: GroupMetadata = {
+    id: groupId,
+    addressingMode: group.attrs.addressing_mode as "pn" | "lid",
+    subject: group.attrs.subject,
+    subjectOwner: group.attrs.s_o,
+    subjectOwnerJid: group.attrs.s_o_pn,
+    subjectTime: +group.attrs.s_t,
+    size: getBinaryNodeChildren(group, "participant").length,
+    creation: +group.attrs.creation,
+    owner: group.attrs.creator
+      ? jidNormalizedUser(group.attrs.creator)
+      : undefined,
+    ownerJid: group.attrs.creator_pn
+      ? jidNormalizedUser(group.attrs.creator_pn)
+      : undefined,
+    desc,
+    descId,
+    descOwner,
+    descOwnerJid,
+    descTime,
+    linkedParent:
+      getBinaryNodeChild(group, "linked_parent")?.attrs.jid || undefined,
+    restrict: !!getBinaryNodeChild(group, "locked"),
+    announce: !!getBinaryNodeChild(group, "announcement"),
+    isCommunity: !!getBinaryNodeChild(group, "parent"),
+    isCommunityAnnounce: !!getBinaryNodeChild(group, "default_sub_group"),
+    joinApprovalMode: !!getBinaryNodeChild(group, "membership_approval_mode"),
+    memberAddMode,
+    participants: getBinaryNodeChildren(group, "participant").map(
+      ({ attrs }) => {
+        return {
+          id: attrs.jid,
+          jid: jidNormalizedUser(attrs?.phone_number || attrs?.jid),
+          admin: (attrs.type || null) as GroupParticipant["admin"],
+        };
+      }
+    ),
+    ephemeralDuration: eph ? +eph : undefined,
+  };
+  return metadata;
+};
+
+export const extractNewsletterMetadata = (
+  node: BinaryNode,
+  isCreate?: boolean
+) => {
+  const result = getBinaryNodeChild(node, "result")?.content?.toString();
+  const metadataPath = JSON.parse(result!).data[
+    isCreate ? XWAPaths.CREATE : XWAPaths.NEWSLETTER
+  ];
+  console.log(metadataPath);
+  const metadata: NewsletterMetadata = {
+    id: metadataPath.id,
+    state: metadataPath.state.type,
+    creation_time: +metadataPath.thread_metadata.creation_time,
+    name: metadataPath.thread_metadata.name.text,
+    nameTime: +metadataPath.thread_metadata.name.update_time,
+    description: metadataPath.thread_metadata.description.text,
+    descriptionTime: +metadataPath.thread_metadata.description.update_time,
+    invite: metadataPath.thread_metadata.invite,
+    handle: metadataPath.thread_metadata.handle,
+    picture: metadataPath.thread_metadata.picture?.direct_path || null,
+    preview: metadataPath.thread_metadata.preview?.direct_path || null,
+    reaction_codes: metadataPath.thread_metadata.settings.reaction_codes.value,
+    subscribers: +metadataPath.thread_metadata.subscribers_count,
+    verification: metadataPath.thread_metadata.verification,
+    viewer_metadata: metadataPath.viewer_metadata,
+  };
+
+  return metadata;
+};
