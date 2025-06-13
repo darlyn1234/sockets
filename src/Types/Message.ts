@@ -240,7 +240,6 @@ export type MessageRelayOptions = MinimalRelayOptions & {
 	useUserDevicesCache?: boolean
 	/** jid list of participants for status@broadcast */
 	statusJidList?: string[]
-	newsletter?: boolean
 }
 
 export type MiscMessageGenerationOptions = MinimalRelayOptions & {
@@ -260,7 +259,6 @@ export type MiscMessageGenerationOptions = MinimalRelayOptions & {
 	font?: number
 	/** if it is broadcast */
 	broadcast?: boolean
-	newsletter?: boolean
 }
 export type MessageGenerationOptionsFromContent = MiscMessageGenerationOptions & {
 	userJid: string
@@ -285,9 +283,6 @@ export type MediaGenerationOptions = {
 	backgroundColor?: string
 
 	font?: number
-	
-	/** The message is for newsletter? */
-	newsletter?: boolean
 }
 export type MessageContentGenerationOptions = MediaGenerationOptions & {
 	getUrlInfo?: (text: string) => Promise<WAUrlInfo | undefined>
