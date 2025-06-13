@@ -16,6 +16,7 @@ import {
 	assertMediaContent,
 	bindWaitForEvent,
 	decryptMediaRetryData,
+	encodeNewsletterMessage,
 	encodeSignedDeviceIdentity,
 	encodeWAMessage,
 	encryptMediaRetryRequest,
@@ -43,10 +44,12 @@ import {
 	jidEncode,
 	jidNormalizedUser,
 	JidWithDevice,
-	S_WHATSAPP_NET
+	S_WHATSAPP_NET,
+	isJidNewsletter
 } from '../WABinary'
 import { USyncQuery, USyncUser } from '../WAUSync'
-import { makeGroupsSocket } from './groups'
+//import { makeGroupsSocket } from './groups'
+import { makeNewsletterSocket } from './newsletter'
 
 export const makeMessagesSocket = (config: SocketConfig) => {
 	const {
@@ -57,7 +60,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		patchMessageBeforeSending,
 		cachedGroupMetadata
 	} = config
-	const sock = makeGroupsSocket(config)
+	//const sock = makeGroupsSocket(config)
+	const sock = makeNewsletterSocket(config)
 	const {
 		ev,
 		authState,
@@ -141,8 +145,12 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			}
 		}
 
-		if (type) {
+		/*if (type) {
 			node.attrs.type = type
+		}*/
+
+		if (type) {
+			node.attrs.type = isJidNewsletter(jid) ? 'read-self' : type
 		}
 
 		const remainingMessageIds = messageIds.slice(1)
@@ -372,6 +380,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		const { user, server } = jidDecode(jid)!
 		const statusJid = 'status@broadcast'
 		const isGroup = server === 'g.us'
+		//recien agregado xd
+		const isNewsLetter = server === 'newsletter'
 		const isStatus = jid === statusJid
 		const isLid = server === 'lid'
 
@@ -380,7 +390,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		useCachedGroupMetadata = useCachedGroupMetadata !== false && !isStatus
 
 		const participants: BinaryNode[] = []
-		const destinationJid = !isStatus ? jidEncode(user, isLid ? 'lid' : isGroup ? 'g.us' : 's.whatsapp.net') : statusJid
+		const destinationJid = !isStatus ? jidEncode(user, isLid ? 'lid' : isGroup ? 'g.us' : isNewsLetter ? 'newsletter' : 's.whatsapp.net') : statusJid
+		//const destinationJid = !isStatus ? jidEncode(user, isLid ? 'lid' : isGroup ? 'g.us' : 's.whatsapp.net') : statusJid
 		const binaryNodeContent: BinaryNode[] = []
 		const devices: JidWithDevice[] = []
 
@@ -506,6 +517,27 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				})
 
 				await authState.keys.set({ 'sender-key-memory': { [jid]: senderKeyMap } })
+			} else if (isNewsLetter) {
+									if(message.protocolMessage?.editedMessage) {
+										msgId = message.protocolMessage.key?.id!
+										message = message.protocolMessage.editedMessage
+									}
+									// Message delete
+									if(message.protocolMessage?.type === proto.Message.ProtocolMessage.Type.REVOKE) {
+										msgId = message.protocolMessage.key?.id!
+										message = {}
+									}
+									const patched = await patchMessageBeforeSending(message, [])
+									if(Array.isArray(patched)) {
+										throw new Boom('Per-jid patching is not supported in channel')
+									}
+									const bytes = encodeNewsletterMessage(patched)
+									binaryNodeContent.push({
+										tag: 'plaintext',
+										attrs: mediaType ? { mediatype: mediaType } : {},
+										content: bytes
+									})
+
 			} else {
 				const { user: meUser } = jidDecode(meId)!
 
@@ -573,7 +605,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			const stanza: BinaryNode = {
 				tag: 'message',
 				attrs: {
-					id: msgId,
+					id: msgId!,
 					type: getMessageType(message),
 					...(additionalAttributes || {})
 				},
@@ -815,7 +847,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 						additionalAttributes.edit = '7'
 					}
 				} else if (isEditMsg) {
-					additionalAttributes.edit = '1'
+					additionalAttributes.edit = isJidNewsletter(jid) ? '3' : '1'
+					//additionalAttributes.edit = '1'
 				} else if (isPinMsg) {
 					additionalAttributes.edit = '2'
 				} else if (isPollMessage) {
