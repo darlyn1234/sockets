@@ -89,10 +89,6 @@ export const unpadRandomMax16 = (e: Uint8Array | Buffer) => {
 
 export const encodeWAMessage = (message: proto.IMessage) => writeRandomPadMax16(proto.Message.encode(message).finish())
 
-export const encodeNewsletterMessage = (message: proto.IMessage) => (
-	proto.Message.encode(message).finish()
-)
-
 export const generateRegistrationId = (): number => {
 	return Uint16Array.from(randomBytes(2))[0] & 16383
 }
