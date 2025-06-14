@@ -22,7 +22,6 @@ import {
 	extractDeviceJids,
 	generateMessageIDV2,
 	generateWAMessage,
-	getContentType,
 	getStatusCodeForMediaRetry,
 	getUrlFromDirectPath,
 	getWAUploadToServer,
@@ -613,22 +612,18 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			logger.debug({ msgId }, `sending message to ${participants.length} devices`)
 
 			await sendNode(stanza)
-		}
-	)
+		})
 
-	return msgId
-}
+		return msgId
+	}
 
 	const getMessageType = (message: proto.IMessage) => {
-		if (
-			message.pollCreationMessage ||
-			message.pollCreationMessageV2 ||
-			message.pollCreationMessageV3
-		) {
-			return "poll";
+		if (message.pollCreationMessage || message.pollCreationMessageV2 || message.pollCreationMessageV3) {
+			return 'poll'
 		}
-		return "text";
-	};
+
+		return 'text'
+	}
 
 	const getMediaType = (message: proto.IMessage) => {
 		if (message.imageMessage) {
