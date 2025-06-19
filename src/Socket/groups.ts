@@ -13,6 +13,7 @@ import {
 	getBinaryNodeChild,
 	getBinaryNodeChildren,
 	getBinaryNodeChildString,
+	isLidUser,
 	jidEncode,
 	jidNormalizedUser
 } from '../WABinary'
@@ -350,6 +351,7 @@ export const extractGroupMetadata = (result: BinaryNode) => {
 			return {
 				id: attrs.jid,
 				jid: jidNormalizedUser(attrs?.phone_number || attrs?.jid),
+				lid: isLidUser(attrs.jid) ? attrs.jid : attrs.lid,
 				admin: (attrs.type || null) as GroupParticipant['admin']
 			}
 		}),
