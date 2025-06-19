@@ -39,8 +39,8 @@ export const processHistoryMessage = (item: proto.IHistorySync) => {
 			for (const chat of item.conversations! as Chat[]) {
 				contacts.push({
 					id: chat.id,
-					name: chat.name,
-					lid: chat.lidJid,
+					name: chat.name ?? undefined,
+					lid: chat.lidJid ?? undefined,
 					jid: isJidUser(chat.id) ? chat.id : undefined
 				})
 				//contacts.push({ id: chat.id, name: chat.name || undefined })
