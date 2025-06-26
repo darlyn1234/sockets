@@ -6738,10 +6738,10 @@ set-function-name@^2.0.2:
     functions-have-names "^1.2.3"
     has-property-descriptors "^1.0.2"
 
-sharp@^0.32.6:
-  version "0.32.6"
-  resolved "https://registry.yarnpkg.com/sharp/-/sharp-0.32.6.tgz#6ad30c0b7cd910df65d5f355f774aa4fce45732a"
-  integrity sha512-KyLTWwgcR9Oe4d9HwCwNM2l7+J0dUQwn/yf7S0EnTtb0eVS4RxO0eUSvxPtzT4F3SY+C4K6fqdv/DO27sJ/v/w==
+sharp@^0.34.1:
+  version "0.34.1"
+  resolved "https://registry.yarnpkg.com/sharp/-/sharp-0.34.1.tgz#cf7c0875eec372fbfb720a2f32a0ecb65e8f79d2"
+  integrity sha512-jZzppEUt4w8Vd9Ox9PCaqPoWR7Og5ONNk9txHKcP3vm/1lmXBLj4RK95lQzvVbgSK7pSDqPC6I1g0U1Sy8nDaA==
   dependencies:
     color "^4.2.3"
     detect-libc "^2.0.2"
