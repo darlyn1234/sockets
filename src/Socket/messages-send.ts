@@ -24,6 +24,7 @@ import {
   generateMessageIDV2,
   generateWAMessage,
   generateWAMessageFromContent,
+  getContentType,
   getStatusCodeForMediaRetry,
   getUrlFromDirectPath,
   getWAUploadToServer,
@@ -682,6 +683,25 @@ export const makeMessagesSocket = (config: SocketConfig) => {
       if (additionalNodes && additionalNodes.length > 0) {
         (stanza.content as BinaryNode[]).push(...additionalNodes);
       }
+      const content = normalizeMessageContent(message)!
+      const contentType = getContentType(content)!
+				if((isJidGroup(jid) || isJidUser(jid)) && (contentType === 'interactiveMessage')) {
+				const bizNode: BinaryNode = { tag: 'biz', attrs: {} }
+				if((message?.viewOnceMessage?.message?.interactiveMessage || message?.viewOnceMessageV2?.message?.interactiveMessage || message?.viewOnceMessageV2Extension?.message?.interactiveMessage || message?.interactiveMessage)) {
+						bizNode.content = [{
+							tag: 'interactive',
+							attrs: {
+								type: 'native_flow',
+								v: '1'
+							},
+							content: [{
+								tag: 'native_flow',
+								attrs: { v: '9', name: 'mixed' }
+							}]
+						}]
+					}
+					(stanza.content as BinaryNode[]).push(bizNode);
+				}
 
       logger.debug(
         { msgId },
@@ -990,6 +1010,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
         const isEditMsg = "edit" in content && !!content.edit;
         const isPinMsg = "pin" in content && !!content.pin;
         const isPollMessage = "poll" in content && !!content.poll;
+        const isIaMsg = "ai" in content && !!content.ai;
         const additionalAttributes: BinaryNodeAttributes = {};
         const additionalNodes: BinaryNode[] = [];
         // required for delete
@@ -1014,6 +1035,13 @@ export const makeMessagesSocket = (config: SocketConfig) => {
               polltype: "creation",
             },
           } as BinaryNode);
+        } else if (isIaMsg) {
+          additionalNodes.push({
+            attrs: {
+              biz_bot: '1'
+            },
+            tag: "bot"
+          })
         }
 
         if ("cachedGroupMetadata" in options) {

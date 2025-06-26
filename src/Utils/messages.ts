@@ -566,6 +566,59 @@ export const generateWAMessageContent = async (
     m = await prepareWAMessageMedia(message, options);
   }
 
+	if('interactiveButtons' in message && !!message.interactiveButtons) {
+		const interactiveMessage: proto.Message.IInteractiveMessage = {
+			nativeFlowMessage: WAProto.Message.InteractiveMessage.NativeFlowMessage.fromObject({
+				buttons: message.interactiveButtons,
+			})
+		};
+
+		if('text' in message) {
+			interactiveMessage.body = {
+				text: message.text
+			};
+		} else if('caption' in message) {
+			interactiveMessage.body = {
+				text: message.caption
+			}
+
+			interactiveMessage.header = {
+				title: message.title,
+				subtitle: message.subtitle,
+				hasMediaAttachment: message?.media ?? false,
+			};
+
+			Object.assign(interactiveMessage.header, m);
+		}
+
+		if('footer' in message && !!message.footer) {
+			interactiveMessage.footer = {
+				text: message.footer
+			};
+		}
+
+		if('title' in message && !!message.title) {
+			interactiveMessage.header = {
+				title: message.title,
+				subtitle: message.subtitle,
+				hasMediaAttachment: message?.media ?? false,
+			};
+
+			Object.assign(interactiveMessage.header, m);
+		}
+
+		if('contextInfo' in message && !!message.contextInfo) {
+			interactiveMessage.contextInfo = message.contextInfo;
+		}
+
+		if('mentions' in message && !!message.mentions) {
+			interactiveMessage.contextInfo = { mentionedJid: message.mentions };
+		}
+
+		m = { interactiveMessage };
+	}
+
+
   if ("viewOnce" in message && !!message.viewOnce) {
     m = { viewOnceMessage: { message: m } };
   }

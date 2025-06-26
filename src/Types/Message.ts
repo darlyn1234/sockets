@@ -79,6 +79,21 @@ type ViewOnce = {
 	viewOnce?: boolean
 }
 
+type Templatable = {
+	/** add buttons to the message (conflicts with normal buttons)*/
+	templateButtons?: proto.IHydratedTemplateButton[]
+
+	footer?: string
+}
+
+type Interactiveable = {
+	/** add buttons to the message  */
+	interactiveButtons?: proto.Message.InteractiveMessage.NativeFlowMessage.NativeFlowButton[]
+	title?: string
+	subtitle?: string
+	media?: boolean
+}
+
 type Editable = {
 	edit?: WAMessageKey
 }
@@ -112,6 +127,8 @@ export type AnyMediaMessageContent = (
 			jpegThumbnail?: string
 	  } & Mentionable &
 			Contextable &
+			Templatable &
+			Interactiveable &
 			WithDimensions)
 	| ({
 			video: WAMediaUpload
@@ -122,6 +139,8 @@ export type AnyMediaMessageContent = (
 			ptv?: boolean
 	  } & Mentionable &
 			Contextable &
+			Templatable &
+			Interactiveable &
 			WithDimensions)
 	| {
 			audio: WAMediaUpload
@@ -139,7 +158,7 @@ export type AnyMediaMessageContent = (
 			mimetype: string
 			fileName?: string
 			caption?: string
-	  } & Contextable)
+	  } & Contextable & Interactiveable & Templatable)
 ) & { mimetype?: string } & Editable
 
 export type ButtonReplyInfo = {
@@ -177,12 +196,15 @@ export type AnyRegularMessageContent = (
 			linkPreview?: WAUrlInfo | null
 	  } & Mentionable &
 			Contextable &
+			Templatable &
+			Interactiveable &
 			Editable)
 	| AnyMediaMessageContent
 	| ({
 			poll: PollMessageOptions
 	  } & Mentionable &
 			Contextable &
+			Templatable &
 			Editable)
 	| {
 			contacts: {
