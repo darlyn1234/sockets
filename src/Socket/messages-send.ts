@@ -3,6 +3,7 @@ import { Boom } from '@hapi/boom'
 import { proto } from '../../WAProto'
 import { DEFAULT_CACHE_TTLS, WA_DEFAULT_EPHEMERAL } from '../Defaults'
 import {
+	AlbumMedia,
 	AnyMessageContent,
 	MediaConnInfo,
 	MessageReceiptType,
@@ -22,6 +23,7 @@ import {
 	extractDeviceJids,
 	generateMessageIDV2,
 	generateWAMessage,
+	generateWAMessageFromContent,
 	getStatusCodeForMediaRetry,
 	getUrlFromDirectPath,
 	getWAUploadToServer,
@@ -46,6 +48,7 @@ import {
 } from '../WABinary'
 import { USyncQuery, USyncUser } from '../WAUSync'
 import { makeGroupsSocket } from './groups'
+import { randomBytes } from 'crypto'
 
 export const makeMessagesSocket = (config: SocketConfig) => {
 	const {
@@ -754,6 +757,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		},
 		sendMessage: async (jid: string, content: AnyMessageContent, options: MiscMessageGenerationOptions = {}) => {
 			const userJid = authState.creds.me!.id
+			if (!options.ephemeralExpiration) {
 			if(isJidGroup(jid)) {
 				const groups = await sock.groupQuery(jid, 'get', [{
 					tag: 'query',
@@ -765,6 +769,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				const expiration = getBinaryNodeChild(metadata, 'ephemeral')?.attrs?.expiration || 0
 				options.ephemeralExpiration = expiration
 			}
+		}
 			if (
 				typeof content === 'object' &&
 				'disappearingMessagesInChat' in content &&
@@ -779,6 +784,69 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 							: 0
 						: disappearingMessagesInChat
 				await groupToggleEphemeral(jid, value)
+			}
+			if(typeof content === 'object' && 'album' in content && content.album) {
+				const { album, caption } = content as ({ album: AlbumMedia[], caption?: string } & AnyMessageContent)
+				if(caption && !album[0].caption) {
+					album[0].caption = caption
+				}
+				let mediaMsg
+				const albumMsg = generateWAMessageFromContent(jid, {
+					albumMessage: {
+						expectedImageCount: album.filter(item => 'image' in item).length,
+						expectedVideoCount: album.filter(item => 'video' in item).length
+					}
+				}, { userJid, ...options })
+
+				await relayMessage(jid, albumMsg.message!, {
+					messageId: albumMsg.key.id!
+				})
+
+				for (const i in album) {
+					const media = album[i]
+					if('image' in media) {
+						mediaMsg = await generateWAMessage(jid,
+							{ 
+								image: media.image,
+								...(media.caption ? { caption: media.caption } : {}),
+								...options
+							},
+							{ 
+								userJid,
+								upload: waUploadToServer,
+								...options, 
+							}
+						)
+					} else if('video' in media) {
+						mediaMsg = await generateWAMessage(jid,
+							{ 
+								video: media.video,
+								...(media.caption ? { caption: media.caption } : {}),
+								...(media.gifPlayback !== undefined ? { gifPlayback: media.gifPlayback } : {}),
+								...options
+							},
+							{ 
+								userJid,
+								upload: waUploadToServer,
+								...options, 
+							}
+						)
+					}
+					if(mediaMsg) {
+						mediaMsg.message.messageContextInfo = {
+							messageSecret: randomBytes(32),
+							messageAssociation: {
+								associationType: 1,
+								parentMessageKey: albumMsg.key!
+							}
+						}
+					}
+					await relayMessage(jid, mediaMsg.message!, {
+						messageId: mediaMsg.key.id!
+					})
+					await new Promise(resolve => setTimeout(resolve, 800))
+				}
+				return albumMsg
 			} else {
 				const fullMsg = await generateWAMessage(jid, content, {
 					logger,
