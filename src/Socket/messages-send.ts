@@ -426,6 +426,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
         destinationJid,
         message,
       },
+      messageContextInfo: message.messageContextInfo
     };
 
     const extraAttrs = {};
