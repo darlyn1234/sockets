@@ -140,14 +140,13 @@ export const extractImageThumb = async (bufferOrFilePath: Readable | Buffer | st
 export const encodeBase64EncodedStringForUpload = (b64: string) =>
 	encodeURIComponent(b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/\=+$/, ''))
 
-
-export const generateProfilePicture = async(mediaUpload: WAMediaUpload) => {
+export const generateProfilePicture = async (mediaUpload: WAMediaUpload) => {
 	let bufferOrFilePath: Buffer | string
 	let img: Promise<Buffer>
 
-	if(Buffer.isBuffer(mediaUpload)) {
+	if (Buffer.isBuffer(mediaUpload)) {
 		bufferOrFilePath = mediaUpload
-	} else if('url' in mediaUpload) {
+	} else if ('url' in mediaUpload) {
 		bufferOrFilePath = mediaUpload.url.toString()
 	} else {
 		bufferOrFilePath = await toBuffer(mediaUpload.stream)
@@ -156,12 +155,10 @@ export const generateProfilePicture = async(mediaUpload: WAMediaUpload) => {
 	const jimp = await Jimp.read(bufferOrFilePath as any)
 	const cropped = jimp.getWidth() > jimp.getHeight() ? jimp.resize(550, -1) : jimp.resize(-1, 650)
 
-		img = cropped
-			.quality(100)
-			.getBufferAsync(Jimp.MIME_JPEG)
+	img = cropped.quality(100).getBufferAsync(Jimp.MIME_JPEG)
 
 	return {
-		img: await img,
+		img: await img
 	}
 }
 
@@ -180,7 +177,7 @@ export async function getAudioDuration(buffer: Buffer | string | Readable) {
 	if (Buffer.isBuffer(buffer)) {
 		metadata = await musicMetadata.parseBuffer(buffer, undefined, options)
 	} else if (typeof buffer === 'string') {
-			metadata = await musicMetadata.parseFile(buffer, options)
+		metadata = await musicMetadata.parseFile(buffer, options)
 	} else {
 		metadata = await musicMetadata.parseStream(buffer, undefined, options)
 	}

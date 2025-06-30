@@ -15,7 +15,14 @@ import {
 	WAPatchName
 } from '../Types'
 import { ChatLabelAssociation, LabelAssociationType, MessageLabelAssociation } from '../Types/LabelAssociation'
-import { BinaryNode, getBinaryNodeChild, getBinaryNodeChildren, isJidGroup, isJidUser, jidNormalizedUser } from '../WABinary'
+import {
+	BinaryNode,
+	getBinaryNodeChild,
+	getBinaryNodeChildren,
+	isJidGroup,
+	isJidUser,
+	jidNormalizedUser
+} from '../WABinary'
 import { aesDecrypt, aesEncrypt, hkdf, hmacSign } from './crypto'
 import { toNumber } from './generics'
 import { ILogger } from './logger'
