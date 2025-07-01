@@ -17,6 +17,7 @@ import {
 	assertMediaContent,
 	bindWaitForEvent,
 	decryptMediaRetryData,
+	encodeNewsletterMessage,
 	encodeSignedDeviceIdentity,
 	encodeWAMessage,
 	encryptMediaRetryRequest,
@@ -48,6 +49,7 @@ import {
 } from '../WABinary'
 import { USyncQuery, USyncUser } from '../WAUSync'
 import { makeGroupsSocket } from './groups'
+import { makeNewsletterSocket, NewsletterSocket } from './newsletter'
 import { randomBytes } from 'crypto'
 
 export const makeMessagesSocket = (config: SocketConfig) => {
@@ -59,7 +61,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		patchMessageBeforeSending,
 		cachedGroupMetadata
 	} = config
-	const sock = makeGroupsSocket(config)
+	const sock: NewsletterSocket = makeNewsletterSocket(makeGroupsSocket(config))
 	const {
 		ev,
 		authState,
@@ -379,6 +381,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		const isGroup = server === 'g.us'
 		const isStatus = jid === statusJid
 		const isLid = server === 'lid'
+		const isNewsletter = server === 'newsletter'
 
 		msgId = msgId || generateMessageIDV2(sock.user?.id)
 		useUserDevicesCache = useUserDevicesCache !== false
@@ -418,6 +421,30 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			const mediaType = getMediaType(message)
 			if (mediaType) {
 				extraAttrs['mediatype'] = mediaType
+			}
+
+			if (isNewsletter) {
+				// Patch message if needed, then encode as plaintext
+				const patched = patchMessageBeforeSending ? await patchMessageBeforeSending(message, []) : message
+				const bytes = encodeNewsletterMessage(patched as proto.IMessage)
+				binaryNodeContent.push({
+					tag: 'plaintext',
+					attrs: {},
+					content: bytes
+				})
+				const stanza: BinaryNode = {
+					tag: 'message',
+					attrs: {
+						to: jid,
+						id: msgId,
+						type: getMessageType(message),
+						...(additionalAttributes || {})
+					},
+					content: binaryNodeContent
+				}
+				logger.debug({ msgId }, `sending newsletter message to ${jid}`)
+				await sendNode(stanza)
+				return
 			}
 
 			if (normalizeMessageContent(message)?.pinInChatMessage) {
