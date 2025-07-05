@@ -9,7 +9,7 @@ import { normalizeMessageContent } from './messages'
 import { downloadContentFromMessage } from './messages-media'
 
 const inflatePromise = promisify(inflate)
-
+//@ts-ignore
 export const downloadHistory = async (msg: proto.Message.IHistorySyncNotification, options: AxiosRequestConfig<{}>) => {
 	const stream = await downloadContentFromMessage(msg, 'md-msg-hist', { options })
 	const bufferArray: Buffer[] = []
@@ -39,17 +39,13 @@ export const processHistoryMessage = (item: proto.IHistorySync) => {
 			for (const chat of item.conversations! as Chat[]) {
 				contacts.push({
 					id: chat.id,
-					name: chat.name ?? undefined,
-					lid: chat.lidJid ?? undefined,
+					name: chat.name || undefined,
+					lid: chat.lidJid || undefined,
 					jid: isJidUser(chat.id) ? chat.id : undefined
 				})
-				//contacts.push({ id: chat.id, name: chat.name || undefined })
 
 				const msgs = chat.messages || []
 				delete chat.messages
-				delete chat.archived
-				delete chat.muteEndTime
-				delete chat.pinned
 
 				for (const item of msgs) {
 					const message = item.message!
@@ -76,10 +72,6 @@ export const processHistoryMessage = (item: proto.IHistorySync) => {
 					}
 				}
 
-				if (isJidUser(chat.id) && chat.readOnly && chat.archived) {
-					delete chat.readOnly
-				}
-
 				chats.push({ ...chat })
 			}
 
@@ -103,6 +95,7 @@ export const processHistoryMessage = (item: proto.IHistorySync) => {
 
 export const downloadAndProcessHistorySyncNotification = async (
 	msg: proto.Message.IHistorySyncNotification,
+	//@ts-ignore
 	options: AxiosRequestConfig<{}>
 ) => {
 	const historyMsg = await downloadHistory(msg, options)
