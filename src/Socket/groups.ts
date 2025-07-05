@@ -89,7 +89,7 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 
 	return {
 		...sock,
-		groupQuery,
+		//groupQuery,
 		groupMetadata,
 		groupCreate: async (subject: string, participants: string[]) => {
 			const key = generateMessageIDV2()
