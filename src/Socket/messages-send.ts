@@ -659,10 +659,6 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		if (message.pollCreationMessage || message.pollCreationMessageV2 || message.pollCreationMessageV3) {
 			return 'poll'
 		}
-		if (getMediaType(message)) {
-			return 'media'
-		}
-
 		return 'text'
 	}
 
@@ -683,8 +679,6 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			return 'livelocation'
 		} else if (message.stickerMessage) {
 			return 'sticker'
-		} else if (message.stickerPackMessage) {
-			return 'sticker_pack'
 		} else if (message.listMessage) {
 			return 'list'
 		} else if (message.listResponseMessage) {
