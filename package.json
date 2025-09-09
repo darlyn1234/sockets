@@ -43,7 +43,7 @@
     "lru-cache": "^11.1.0",
     "music-metadata": "^11.4.0",
     "pino": "^9.7.0",
-    "protobufjs": "7.5.3",
+    "protobufjs": "^6.11.2",
     "ws": "^8.18.3"
   },
   "devDependencies": {
