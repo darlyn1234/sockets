@@ -16,6 +16,7 @@ const compat = new FlatCompat({
 });
 
 export default defineConfig([globalIgnores([
+    "src/Tests/*",
     "**/lib",
     "**/coverage",
     "**/*.lock",
