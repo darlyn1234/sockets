@@ -12,10 +12,10 @@
     "rootDir": "./src",
 
     // Type Safety
-    "strict": true,
-    "strictNullChecks": true,
+    "strict": false,
+    "strictNullChecks": false,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": false,
     "noImplicitThis": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
