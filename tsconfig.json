@@ -1,33 +1,21 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "es2018",
     "module": "CommonJS",
-    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "allowJs": false,
+    "checkJs": false,
     "outDir": "lib",
-    "declaration": true,
-    "sourceMap": true,
-    "declarationMap": true,
-
-    "lib": ["ES2020", "ESNext.Array", "DOM"],
-    "rootDir": "./src",
-
-    // Type Safety
     "strict": false,
-    "strictNullChecks": false,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": false,
-    "noImplicitThis": true,
-    "forceConsistentCasingInFileNames": true,
+    "strictNullChecks": true,
     "skipLibCheck": true,
-
-    // Interop
+    "noImplicitThis": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-
-    // DX Boosters
-    "allowJs": false,
-    "checkJs": false
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "lib": ["es2020", "esnext.array", "DOM"]
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": ["./src/**/*.ts"],
+  "exclude": ["node_modules", "src/Tests/*", "src/Binary/GenerateStatics.ts"]
 }
