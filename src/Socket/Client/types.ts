@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
 import { URL } from 'url'
-import { SocketConfig } from '../../Types'
+import type { SocketConfig } from '../../Types'
 
 export abstract class AbstractSocketClient extends EventEmitter {
 	abstract get isOpen(): boolean
@@ -18,6 +18,5 @@ export abstract class AbstractSocketClient extends EventEmitter {
 
 	abstract connect(): Promise<void>
 	abstract close(): Promise<void>
-	abstract restart(): Promise<void>
 	abstract send(str: Uint8Array | string, cb?: (err?: Error) => void): boolean
 }
