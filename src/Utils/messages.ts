@@ -637,6 +637,7 @@ export const generateWAMessageFromContent = (
 		}
 
 		const contextInfo: proto.IContextInfo =
+		//@ts-ignore
 			('contextInfo' in innerMessage[key]! && innerMessage[key]?.contextInfo) || {}
 		contextInfo.participant = jidNormalizedUser(participant!)
 		contextInfo.stanzaId = quoted.key.id

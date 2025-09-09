@@ -144,6 +144,7 @@ export type EventMessageOptions = {
 	isCancelled?: boolean
 	isScheduleCall?: boolean
 	extraGuestsAllowed?: boolean
+	//@ts-ignore
 	messageSecret?: Uint8Array<ArrayBufferLike>
 }
 

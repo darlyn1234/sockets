@@ -30,11 +30,15 @@ const parseNewsletterMetadata = (result: unknown): NewsletterMetadata | null => 
 		return null
 	}
 
+	//@ts-ignore
 	if ('id' in result && typeof result.id === 'string') {
+		//@ts-ignore
 		return result as NewsletterMetadata
 	}
 
+	//@ts-ignore
 	if ('result' in result && typeof result.result === 'object' && result.result !== null && 'id' in result.result) {
+		//@ts-ignore
 		return result.result as NewsletterMetadata
 	}
 
