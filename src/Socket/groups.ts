@@ -7,8 +7,6 @@ import {
 	getBinaryNodeChild,
 	getBinaryNodeChildren,
 	getBinaryNodeChildString,
-	isLidUser,
-	isPnUser,
 	jidEncode,
 	jidNormalizedUser
 } from '../WABinary'
