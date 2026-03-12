@@ -2383,6 +2383,11 @@ crypto-random-string@^4.0.0:
   dependencies:
     type-fest "^1.0.1"
 
+crypto@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.npmjs.org/crypto/-/crypto-1.0.1.tgz"
+  integrity sha512-VxBKmeNcqQdiUQUW2Tzq0t377b54N2bMtXO/qiLa+6eRRmmC4qT3D4OnTGoT/U6O9aklQ/jTwbOtRMTTY8G0Ig==
+
 css-select@^5.1.0:
   version "5.2.2"
   resolved "https://registry.npmjs.org/css-select/-/css-select-5.2.2.tgz"
@@ -4738,10 +4743,11 @@ levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
-"libsignal@git+https://github.com/whiskeysockets/libsignal-node":
-  version "2.0.1"
-  resolved "git+ssh://git@github.com/whiskeysockets/libsignal-node.git#e81ecfc32eb74951d789ab37f7e341ab66d5fff1"
+"libsignal@git+https://github.com/darlyn1234/signal":
+  version "2.2.6"
+  resolved "git+ssh://git@github.com/darlyn1234/signal.git#64783660cfb1818dae2f987e323988817685a9b1"
   dependencies:
+    crypto "^1.0.1"
     curve25519-js "^0.0.4"
     protobufjs "6.8.8"
 
